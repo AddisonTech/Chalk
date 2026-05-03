@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Film, ClipboardList, BookOpen, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserMenu } from "@/components/auth/UserMenu";
 
 type NavItem = {
   href: string;
@@ -19,7 +20,11 @@ const NAV: NavItem[] = [
   { href: "/playbook", label: "Playbook", icon: BookOpen, hint: "Game plan" },
 ];
 
-export function Sidebar() {
+type Props = {
+  email: string;
+};
+
+export function Sidebar({ email }: Props) {
   const pathname = usePathname();
 
   return (
@@ -64,24 +69,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border px-5 py-4">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          Intelligence layers
-        </div>
-        <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-          <li className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-            Recognition
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-            Analytics
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-chart-3" />
-            Recommendation
-          </li>
-        </ul>
+      <div className="border-t border-sidebar-border p-3">
+        <UserMenu email={email} />
       </div>
     </aside>
   );
