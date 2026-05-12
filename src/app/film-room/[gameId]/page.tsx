@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { getGame } from "@/app/actions/film-room";
-import { TendencyReport } from "@/components/film-room/tendency-report";
+import { getGame, getPlays } from "@/app/actions/film-room";
+import { GameDetailClient } from "@/components/film-room/game-detail-client";
 
 interface Props {
   params: Promise<{ gameId: string }>;
@@ -11,7 +11,7 @@ interface Props {
 
 export default async function GameDetail({ params }: Props) {
   const { gameId } = await params;
-  const game = await getGame(gameId);
+  const [game, plays] = await Promise.all([getGame(gameId), getPlays(gameId)]);
   if (!game) notFound();
 
   const oppsRaw = game.opponents as unknown as { name: string } | { name: string }[] | null;
@@ -37,7 +37,7 @@ export default async function GameDetail({ params }: Props) {
       />
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-6xl px-8 py-10">
-          <TendencyReport opponentName={opp} />
+          <GameDetailClient gameId={gameId} opponentName={opp} plays={plays} />
         </div>
       </div>
     </>

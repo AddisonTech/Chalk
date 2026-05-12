@@ -1,3 +1,5 @@
+"use client";
+
 import { generateTendency } from "@/lib/tendency";
 
 interface Props {
