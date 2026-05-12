@@ -14,7 +14,7 @@ export default function Playbook() {
           <EmptyState
             icon={BookOpen}
             title="No weekly plans yet"
-            description="Once Film Room has opponent data, the Playbook will generate prep output — situational calls, tendency attacks, and practice scripts."
+            description="Once Film Room has opponent data, the Playbook will generate prep output: situational calls, tendency attacks, and practice scripts."
           />
         </div>
       </div>
