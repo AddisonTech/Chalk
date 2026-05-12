@@ -95,3 +95,52 @@ export async function getGame(gameId: string) {
 
   return data;
 }
+
+export async function getPlays(gameId: string) {
+  const { supabase, teamId } = await getTeamId();
+  if (!teamId) return [];
+
+  const { data } = await supabase
+    .from("plays")
+    .select("id, timestamp_start, timestamp_end, down, distance, yard_line, formation, personnel, motion, concept, play_type, result, notes")
+    .eq("game_id", gameId)
+    .eq("team_id", teamId)
+    .order("timestamp_start", { ascending: true });
+
+  return data ?? [];
+}
+
+export async function createPlay(formData: FormData) {
+  const { supabase, teamId } = await getTeamId();
+  if (!teamId) return { error: "No team found." };
+
+  const gameId = formData.get("game_id") as string;
+
+  const tsStart = formData.get("timestamp_start");
+  const tsEnd = formData.get("timestamp_end");
+  const down = formData.get("down");
+  const distance = formData.get("distance");
+  const yardLine = formData.get("yard_line");
+
+  const { error } = await supabase.from("plays").insert({
+    game_id: gameId,
+    team_id: teamId,
+    timestamp_start: tsStart ? parseInt(tsStart as string, 10) : null,
+    timestamp_end: tsEnd ? parseInt(tsEnd as string, 10) : null,
+    down: down ? parseInt(down as string, 10) : null,
+    distance: distance ? parseInt(distance as string, 10) : null,
+    yard_line: yardLine ? parseInt(yardLine as string, 10) : null,
+    formation: (formData.get("formation") as string) || null,
+    personnel: (formData.get("personnel") as string) || null,
+    motion: (formData.get("motion") as string) || null,
+    concept: (formData.get("concept") as string) || null,
+    play_type: (formData.get("play_type") as string) || null,
+    result: (formData.get("result") as string) || null,
+    notes: (formData.get("notes") as string) || null,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/film-room/${gameId}`);
+  return { ok: true };
+}
