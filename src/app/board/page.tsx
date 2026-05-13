@@ -51,6 +51,7 @@ export default async function Board() {
                     <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Testing</th>
                     <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Tier</th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Fit</th>
+                    <th className="hidden px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground lg:table-cell">Calc</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-background">
@@ -128,7 +129,7 @@ export default async function Board() {
                         )}
                       </td>
 
-                      {/* Scheme fit */}
+                      {/* Manual scheme fit */}
                       <td className="px-4 py-3 text-right font-mono text-xs">
                         {r.scheme_fit_score != null ? (
                           <span className={
@@ -136,6 +137,20 @@ export default async function Board() {
                             r.scheme_fit_score >= 50 ? "text-foreground" : "text-muted-foreground"
                           }>
                             {r.scheme_fit_score}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+
+                      {/* Calculated scheme fit */}
+                      <td className="hidden px-4 py-3 text-right font-mono text-xs lg:table-cell">
+                        {r.calculated_scheme_fit != null ? (
+                          <span className={
+                            r.calculated_scheme_fit >= 75 ? "text-success" :
+                            r.calculated_scheme_fit >= 50 ? "text-foreground" : "text-muted-foreground"
+                          }>
+                            {r.calculated_scheme_fit}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
