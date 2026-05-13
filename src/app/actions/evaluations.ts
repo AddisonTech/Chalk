@@ -58,7 +58,7 @@ export async function computeAndSaveEvaluation(
     (customValues ?? []).map((v) => [v.custom_measurable_id, v.value_numeric]),
   );
 
-  const configs: MeasurableConfig[] = (profileMeasurables as Array<{
+  type ProfMeas = {
     measurable_key: string | null;
     custom_measurable_id: string | null;
     importance: string;
@@ -66,7 +66,8 @@ export async function computeAndSaveEvaluation(
     range_min: number | null;
     range_max: number | null;
     custom_measurables: { id: string; name: string } | null;
-  }>).map((m) => ({
+  };
+  const configs: MeasurableConfig[] = (profileMeasurables as unknown as ProfMeas[]).map((m) => ({
     key: m.measurable_key ?? m.custom_measurable_id ?? "",
     label: m.measurable_key
       ? m.measurable_key

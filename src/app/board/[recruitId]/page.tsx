@@ -94,7 +94,7 @@ export default async function RecruitDetail({ params }: Props) {
     scheme_profile_id: string;
     scheme_profiles: { name: string | null; position: string | null; scheme_tag: string | null } | null;
   };
-  const typedEvals = evaluations as EvalRow[];
+  const typedEvals = evaluations as unknown as EvalRow[];
   const primaryEval = typedEvals.find((e) => e.is_primary) ?? typedEvals[0] ?? null;
 
   let breakdown: MeasurableBreakdownRow[] | null = null;
