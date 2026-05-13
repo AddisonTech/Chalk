@@ -3,6 +3,18 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { getRecruit } from "@/app/actions/board";
+import { getRecruitEvaluations } from "@/app/actions/evaluations";
+import { getProfileMeasurables } from "@/app/actions/scheme-profiles";
+import { getRecruitCustomValues } from "@/app/actions/custom-measurables";
+import {
+  computeSchemeScore,
+  parseHeightToInches,
+  STANDARD_MEASURABLE_KEYS,
+  STANDARD_MEASURABLE_LABELS,
+  type MeasurableConfig,
+  type Importance,
+  type MeasurableBreakdownRow,
+} from "@/lib/scoring";
 
 interface Props {
   params: Promise<{ recruitId: string }>;
@@ -65,12 +77,77 @@ function Stat({ label, value, unit }: { label: string; value: string | number | 
 
 export default async function RecruitDetail({ params }: Props) {
   const { recruitId } = await params;
-  const r = await getRecruit(recruitId);
+  const [r, evaluations] = await Promise.all([
+    getRecruit(recruitId),
+    getRecruitEvaluations(recruitId),
+  ]);
   if (!r) notFound();
 
   const hasGrades = r.film_grade != null || r.athleticism_grade != null || r.technique_grade != null || r.football_iq_grade != null;
   const hasMeasurables = r.forty_yard != null || r.vertical != null || r.bench_reps != null || r.shuttle != null || r.broad_jump != null;
   const location = [r.city, r.state].filter(Boolean).join(", ");
+
+  type EvalRow = {
+    id: string;
+    calculated_score: number | null;
+    is_primary: boolean;
+    scheme_profile_id: string;
+    scheme_profiles: { name: string | null; position: string | null; scheme_tag: string | null } | null;
+  };
+  const typedEvals = evaluations as EvalRow[];
+  const primaryEval = typedEvals.find((e) => e.is_primary) ?? typedEvals[0] ?? null;
+
+  let breakdown: MeasurableBreakdownRow[] | null = null;
+  let primaryProfileName: string | null = null;
+  let missingCriticalCount = 0;
+
+  if (primaryEval) {
+    primaryProfileName = primaryEval.scheme_profiles?.name ?? null;
+    const [profileMeasurables, customValues] = await Promise.all([
+      getProfileMeasurables(primaryEval.scheme_profile_id),
+      getRecruitCustomValues(recruitId),
+    ]);
+
+    type ProfMeasRow = {
+      measurable_key: string | null;
+      custom_measurable_id: string | null;
+      importance: string;
+      target_value: number | null;
+      range_min: number | null;
+      range_max: number | null;
+    };
+
+    const customValueMap = new Map<string, number | null>(
+      (customValues as { custom_measurable_id: string; value_numeric: number | null }[])
+        .map((v) => [v.custom_measurable_id, v.value_numeric])
+    );
+
+    const configs: MeasurableConfig[] = (profileMeasurables as ProfMeasRow[]).map((m) => ({
+      key: m.measurable_key ?? m.custom_measurable_id ?? "",
+      label: m.measurable_key
+        ? STANDARD_MEASURABLE_LABELS[m.measurable_key as typeof STANDARD_MEASURABLE_KEYS[number]] ?? m.measurable_key
+        : m.custom_measurable_id ?? "",
+      importance: m.importance as Importance,
+      target: m.target_value,
+      rangeMin: m.range_min,
+      rangeMax: m.range_max,
+      isCustom: !m.measurable_key,
+    }));
+
+    function getRecruitValue(key: string): number | null {
+      if ((STANDARD_MEASURABLE_KEYS as readonly string[]).includes(key)) {
+        if (key === "height") return parseHeightToInches(r!.height);
+        const val = (r as Record<string, unknown>)[key];
+        return typeof val === "number" ? val : null;
+      }
+      const cv = customValueMap.get(key);
+      return cv !== undefined ? cv : null;
+    }
+
+    const result = computeSchemeScore(configs, getRecruitValue);
+    breakdown = result.breakdown;
+    missingCriticalCount = result.missingCriticalCount;
+  }
 
   return (
     <>
@@ -151,6 +228,99 @@ export default async function RecruitDetail({ params }: Props) {
                 </div>
               )}
 
+              {breakdown && breakdown.filter((b) => b.importance !== "ignore").length > 0 && (
+                <div className="rounded-sm border border-border bg-surface p-5">
+                  <div className="mb-1 flex items-center justify-between">
+                    <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Scheme Fit Breakdown
+                    </div>
+                    {primaryProfileName && (
+                      <span className="text-[10px] text-muted-foreground">{primaryProfileName}</span>
+                    )}
+                  </div>
+                  {missingCriticalCount > 0 && (
+                    <p className="mb-3 mt-2 text-[11px] text-amber-500">
+                      {missingCriticalCount} critical measurable{missingCriticalCount > 1 ? "s" : ""} missing data
+                    </p>
+                  )}
+                  <div className="mt-4 overflow-hidden rounded-sm border border-border">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-surface">
+                          <th className="px-3 py-2 text-left font-medium text-muted-foreground">Measurable</th>
+                          <th className="px-3 py-2 text-left font-medium text-muted-foreground">Importance</th>
+                          <th className="px-3 py-2 text-right font-medium text-muted-foreground">Value</th>
+                          <th className="px-3 py-2 text-right font-medium text-muted-foreground">Target</th>
+                          <th className="px-3 py-2 text-right font-medium text-muted-foreground">Score</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border bg-background">
+                        {breakdown
+                          .filter((b) => b.importance !== "ignore")
+                          .map((b) => (
+                            <tr key={b.key}>
+                              <td className="px-3 py-2 text-foreground">{b.label}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${
+                                  b.importance === "critical"
+                                    ? "bg-accent/10 text-accent"
+                                    : "bg-surface-raised text-muted-foreground"
+                                }`}>
+                                  {b.importance === "critical" ? "Critical" : "Nice to have"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono text-foreground">
+                                {b.recruitValue != null ? b.recruitValue : (
+                                  <span className={b.missingCritical ? "text-amber-500" : "text-muted-foreground"}>-</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+                                {b.target != null ? b.target : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono">
+                                {b.score != null ? (
+                                  <span className={
+                                    b.score >= 75 ? "text-success" :
+                                    b.score >= 50 ? "text-foreground" : "text-muted-foreground"
+                                  }>
+                                    {b.score.toFixed(0)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {typedEvals.length > 1 && (
+                <div className="rounded-sm border border-border bg-surface p-5">
+                  <div className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">All Evaluations</div>
+                  <div className="flex flex-col divide-y divide-border overflow-hidden rounded-sm border border-border">
+                    {typedEvals.map((e) => (
+                      <div key={e.id} className="flex items-center justify-between px-3 py-2.5">
+                        <div>
+                          <span className="text-xs text-foreground">{e.scheme_profiles?.name ?? "Unknown profile"}</span>
+                          {e.is_primary && (
+                            <span className="ml-2 text-[10px] text-accent">primary</span>
+                          )}
+                        </div>
+                        <span className={`font-mono text-xs font-semibold ${
+                          e.calculated_score != null && e.calculated_score >= 75 ? "text-success" :
+                          e.calculated_score != null && e.calculated_score >= 50 ? "text-foreground" : "text-muted-foreground"
+                        }`}>
+                          {e.calculated_score ?? "-"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* Sidebar */}
@@ -176,13 +346,28 @@ export default async function RecruitDetail({ params }: Props) {
                   {r.scheme_fit_score != null && (
                     <div>
                       <div className="mb-1.5 flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Scheme fit</span>
+                        <span className="text-muted-foreground">Scheme fit (manual)</span>
                         <span className={`font-mono font-semibold ${r.scheme_fit_score >= 75 ? "text-success" : r.scheme_fit_score >= 50 ? "text-foreground" : "text-muted-foreground"}`}>
                           {r.scheme_fit_score}
                         </span>
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-raised">
                         <div className="h-full rounded-full bg-accent" style={{ width: `${r.scheme_fit_score}%` }} />
+                      </div>
+                    </div>
+                  )}
+                  {primaryEval?.calculated_score != null && (
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {primaryProfileName ? `${primaryProfileName}` : "Calc. scheme fit"}
+                        </span>
+                        <span className={`font-mono font-semibold ${primaryEval.calculated_score >= 75 ? "text-success" : primaryEval.calculated_score >= 50 ? "text-foreground" : "text-muted-foreground"}`}>
+                          {primaryEval.calculated_score}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-raised">
+                        <div className="h-full rounded-full bg-success/70" style={{ width: `${primaryEval.calculated_score}%` }} />
                       </div>
                     </div>
                   )}
