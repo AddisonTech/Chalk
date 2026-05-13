@@ -21,8 +21,21 @@ export async function startDemoSession(): Promise<{ error: string } | never> {
     return { error: createError?.message ?? "Could not create demo account" };
   }
 
-  // The handle_new_user trigger already created the profile linked to the demo team.
-  // Mark it so it can be cleaned up later.
+  // Admin-created users bypass the on_auth_user_created trigger, so create
+  // the profile and join the demo team explicitly.
+  const { error: profileError } = await admin.from("profiles").insert({
+    id: data.user.id,
+    team_id: "00000000-0000-0000-0000-000000000001",
+    full_name: "",
+    role: "head_coach",
+  });
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(data.user.id);
+    return { error: "Could not initialize demo account" };
+  }
+
+  // Mark as demo for cleanup tracking (requires migration 0004, non-fatal if missing).
   await admin
     .from("profiles")
     .update({ is_demo: true })
