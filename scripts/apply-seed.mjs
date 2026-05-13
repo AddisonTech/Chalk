@@ -113,6 +113,47 @@ if (rexisting === 0) {
   console.log(`6. Recruits: ${rexisting} rows already present, skipping`);
 }
 
+// ---- Game plans ----
+const REPORT1 = "00000000-0000-0000-0003-000000000001";
+const REPORT2 = "00000000-0000-0000-0003-000000000002";
+const { count: rpexisting } = await admin.from("reports").select("*", { count: "exact", head: true }).eq("team_id", DEMO_TEAM);
+if (rpexisting === 0) {
+  console.log("7. Game plans...");
+  check("reports", (await admin.from("reports").upsert([
+    {
+      id: REPORT1,
+      team_id: DEMO_TEAM,
+      created_by: null,
+      report_type: "game_plan",
+      title: "Week 1 - East Riverside",
+      content: {
+        opponent: "East Riverside",
+        week: 1,
+        season: 2025,
+        game_type: "regular",
+        focus: "Attack their soft zone with crossing concepts. Contain the QB run game with disciplined D-gap assignments on all outside zone looks.",
+      },
+    },
+    {
+      id: REPORT2,
+      team_id: DEMO_TEAM,
+      created_by: null,
+      report_type: "game_plan",
+      title: "Week 4 - North Catholic",
+      content: {
+        opponent: "North Catholic",
+        week: 4,
+        season: 2025,
+        game_type: "regular",
+        focus: "Exploit their single-high tendency with four verticals. In the red zone, use trips RPO to force a declare before the snap.",
+      },
+    },
+  ], { onConflict: "id", ignoreDuplicates: true })).error);
+  console.log("   Inserted 2 game plans");
+} else {
+  console.log(`7. Game plans: ${rpexisting} rows already present, skipping`);
+}
+
 // ---- Final counts ----
 console.log("\n=== Verification ===");
 const { count: tc } = await admin.from("teams").select("*", { count: "exact", head: true });
@@ -120,8 +161,10 @@ const { count: oc } = await admin.from("opponents").select("*", { count: "exact"
 const { count: gc } = await admin.from("games").select("*", { count: "exact", head: true });
 const { count: pc } = await admin.from("plays").select("*", { count: "exact", head: true });
 const { count: rc } = await admin.from("recruits").select("*", { count: "exact", head: true });
+const { count: rpc } = await admin.from("reports").select("*", { count: "exact", head: true }).eq("team_id", DEMO_TEAM);
 console.log(`teams:     ${tc}  (expected 1)`);
 console.log(`opponents: ${oc}  (expected 2)`);
 console.log(`games:     ${gc}  (expected 2)`);
 console.log(`plays:     ${pc}  (expected 24)`);
 console.log(`recruits:  ${rc}  (expected 4)`);
+console.log(`reports:   ${rpc}  (expected 2)`);

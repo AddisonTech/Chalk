@@ -19,7 +19,7 @@ export default async function Dashboard() {
 
   const counts = teamId
     ? await loadCounts(supabase, teamId)
-    : { games: 0, plays: 0, opponents: 0, recruits: 0, reports: 0 };
+    : { games: 0, plays: 0, opponents: 0, recruits: 0, take: 0, watch: 0, reports: 0 };
 
   return (
     <>
@@ -58,8 +58,8 @@ export default async function Dashboard() {
               icon={ClipboardList}
               stats={[
                 { label: "Recruits", value: counts.recruits },
-                { label: "Take", value: 0 },
-                { label: "Watch", value: 0 },
+                { label: "Take", value: counts.take },
+                { label: "Watch", value: counts.watch },
               ]}
             />
             <ModuleCard
@@ -84,18 +84,21 @@ async function loadCounts(
   supabase: Awaited<ReturnType<typeof createClient>>,
   teamId: string,
 ) {
-  const [games, plays, opponents, recruits, reports] = await Promise.all([
+  const [games, plays, opponents, recruitRows, reports] = await Promise.all([
     supabase.from("games").select("*", { count: "exact", head: true }).eq("team_id", teamId),
     supabase.from("plays").select("*", { count: "exact", head: true }).eq("team_id", teamId),
     supabase.from("opponents").select("*", { count: "exact", head: true }).eq("team_id", teamId),
-    supabase.from("recruits").select("*", { count: "exact", head: true }).eq("team_id", teamId),
+    supabase.from("recruits").select("tier").eq("team_id", teamId),
     supabase.from("reports").select("*", { count: "exact", head: true }).eq("team_id", teamId),
   ]);
+  const rows = recruitRows.data ?? [];
   return {
     games: games.count ?? 0,
     plays: plays.count ?? 0,
     opponents: opponents.count ?? 0,
-    recruits: recruits.count ?? 0,
+    recruits: rows.length,
+    take: rows.filter((r) => r.tier === "take").length,
+    watch: rows.filter((r) => r.tier === "watch").length,
     reports: reports.count ?? 0,
   };
 }
