@@ -11,6 +11,8 @@ import {
   type Importance,
 } from "@/lib/scoring";
 
+type DBClient = Awaited<ReturnType<typeof createClient>>;
+
 async function getTeamId() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -23,14 +25,14 @@ async function getTeamId() {
   return { supabase, teamId: profile?.team_id as string | null };
 }
 
-export async function computeAndSaveEvaluation(
+// Core compute + save - no auth, reuses caller's client
+async function computeAndSaveOne(
+  supabase: DBClient,
+  teamId: string,
   recruitId: string,
   profileId: string,
-  isPrimary = false,
-) {
-  const { supabase, teamId } = await getTeamId();
-  if (!teamId) return { error: "No team found." };
-
+  isPrimary: boolean,
+): Promise<{ score?: number; error?: string }> {
   const [{ data: recruit }, { data: profileMeasurables }, { data: customValues }] =
     await Promise.all([
       supabase
@@ -41,9 +43,7 @@ export async function computeAndSaveEvaluation(
         .maybeSingle(),
       supabase
         .from("scheme_profile_measurables")
-        .select(
-          "measurable_key, custom_measurable_id, importance, target_value, range_min, range_max, custom_measurables(id, name)",
-        )
+        .select("measurable_key, custom_measurable_id, importance, target_value, range_min, range_max, custom_measurables(id, name)")
         .eq("profile_id", profileId),
       supabase
         .from("recruit_custom_measurable_values")
@@ -67,11 +67,10 @@ export async function computeAndSaveEvaluation(
     range_max: number | null;
     custom_measurables: { id: string; name: string } | null;
   };
+
   const configs: MeasurableConfig[] = (profileMeasurables as unknown as ProfMeas[]).map((m) => ({
     key: m.measurable_key ?? m.custom_measurable_id ?? "",
-    label: m.measurable_key
-      ? m.measurable_key
-      : (m.custom_measurables?.name ?? "Custom"),
+    label: m.measurable_key ? m.measurable_key : (m.custom_measurables?.name ?? "Custom"),
     importance: m.importance as Importance,
     target: m.target_value,
     rangeMin: m.range_min,
@@ -121,9 +120,96 @@ export async function computeAndSaveEvaluation(
       .eq("team_id", teamId);
   }
 
+  return { score: calculatedScore };
+}
+
+// Compute + save for one recruit+profile (entry point with auth)
+export async function computeAndSaveEvaluation(
+  recruitId: string,
+  profileId: string,
+  isPrimary = false,
+) {
+  const { supabase, teamId } = await getTeamId();
+  if (!teamId) return { error: "No team found." };
+
+  const result = await computeAndSaveOne(supabase, teamId, recruitId, profileId, isPrimary);
+
   revalidatePath("/board");
   revalidatePath(`/board/${recruitId}`);
-  return { score: calculatedScore, breakdown: result.breakdown, missingCriticalCount: result.missingCriticalCount };
+  return result;
+}
+
+// Recalc all evaluations for one recruit (called from UI button)
+export async function recalculateRecruitEvaluations(recruitId: string) {
+  const { supabase, teamId } = await getTeamId();
+  if (!teamId) return { error: "No team found." };
+
+  const { data: evals } = await supabase
+    .from("recruit_scheme_evaluations")
+    .select("scheme_profile_id, is_primary")
+    .eq("recruit_id", recruitId);
+
+  if (!evals?.length) return { updated: 0 };
+
+  await Promise.all(
+    evals.map((e) =>
+      computeAndSaveOne(supabase, teamId, recruitId, e.scheme_profile_id, e.is_primary),
+    ),
+  );
+
+  revalidatePath("/board");
+  revalidatePath(`/board/${recruitId}`);
+  return { updated: evals.length };
+}
+
+// Recalc all evaluations for one profile (called after profile measurables save)
+export async function recalculateProfileEvaluations(profileId: string) {
+  const { supabase, teamId } = await getTeamId();
+  if (!teamId) return { error: "No team found." };
+
+  const { data: evals } = await supabase
+    .from("recruit_scheme_evaluations")
+    .select("recruit_id, is_primary")
+    .eq("scheme_profile_id", profileId);
+
+  if (!evals?.length) return { updated: 0 };
+
+  await Promise.all(
+    evals.map((e) =>
+      computeAndSaveOne(supabase, teamId, e.recruit_id, profileId, e.is_primary),
+    ),
+  );
+
+  for (const e of evals) {
+    revalidatePath(`/board/${e.recruit_id}`);
+  }
+  revalidatePath("/board");
+  return { updated: evals.length };
+}
+
+// Recalc every evaluation for the current team (nuclear option)
+export async function recalculateAllEvaluations() {
+  const { supabase, teamId } = await getTeamId();
+  if (!teamId) return { error: "No team found." };
+
+  const { data: evals } = await supabase
+    .from("recruit_scheme_evaluations")
+    .select("recruit_id, scheme_profile_id, is_primary");
+
+  if (!evals?.length) return { updated: 0 };
+
+  await Promise.all(
+    evals.map((e) =>
+      computeAndSaveOne(supabase, teamId, e.recruit_id, e.scheme_profile_id, e.is_primary),
+    ),
+  );
+
+  const recruitIds = [...new Set(evals.map((e) => e.recruit_id))];
+  for (const id of recruitIds) {
+    revalidatePath(`/board/${id}`);
+  }
+  revalidatePath("/board");
+  return { updated: evals.length };
 }
 
 export async function getRecruitEvaluations(recruitId: string) {
@@ -131,9 +217,7 @@ export async function getRecruitEvaluations(recruitId: string) {
 
   const { data } = await supabase
     .from("recruit_scheme_evaluations")
-    .select(
-      "id, calculated_score, last_calculated_at, is_primary, scheme_profile_id, scheme_profiles(name, position, scheme_tag)",
-    )
+    .select("id, calculated_score, last_calculated_at, is_primary, scheme_profile_id, scheme_profiles(name, position, scheme_tag)")
     .eq("recruit_id", recruitId)
     .order("is_primary", { ascending: false })
     .order("calculated_score", { ascending: false });
