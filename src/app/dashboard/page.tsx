@@ -68,9 +68,9 @@ export default async function Dashboard() {
               description="Weekly prep output. Game plan recommendations, practice priorities, situational call sheets."
               icon={BookOpen}
               stats={[
-                { label: "Reports", value: counts.reports },
-                { label: "Plans", value: 0 },
-                { label: "This Wk", value: 0 },
+                { label: "Plans", value: counts.reports },
+                { label: "Opponents", value: counts.opponents },
+                { label: "Film", value: counts.games },
               ]}
             />
           </div>
