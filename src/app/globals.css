@@ -48,3 +48,55 @@ body {
   background: var(--color-accent);
   color: white;
 }
+
+/* ============================================
+   Animations
+   ============================================ */
+
+@keyframes mesh-drift-a {
+  0%, 100% { transform: translate(0%, 0%); }
+  33% { transform: translate(-5%, 8%); }
+  66% { transform: translate(5%, -3%); }
+}
+
+@keyframes mesh-drift-b {
+  0%, 100% { transform: translate(0%, 0%); }
+  33% { transform: translate(8%, -6%); }
+  66% { transform: translate(-4%, 5%); }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .hero-animate {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
