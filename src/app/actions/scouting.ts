@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { createClient } from "@/lib/supabase/server";
 
 async function getTeamId() {
@@ -142,14 +142,18 @@ Write the report in this format:
 
 Keep it tight. Coach-friendly language. Base everything on the data - if a category has fewer than 3 plays, note the limited sample rather than drawing conclusions.`;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return { error: "GEMINI_API_KEY not set." };
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return { error: "GROQ_API_KEY not set." };
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(prompt);
-    return { report: result.response.text() };
+    const groq = new Groq({ apiKey });
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 1024,
+      temperature: 0.4,
+    });
+    return { report: completion.choices[0].message.content ?? "" };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return { error: `Report generation failed: ${msg}` };
