@@ -19,7 +19,7 @@ interface CustomMeasurable {
 }
 
 interface Props {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export function CustomMeasurablesManager({ onBack }: Props) {
@@ -64,12 +64,14 @@ export function CustomMeasurablesManager({ onBack }: Props) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <button
-          onClick={onBack}
-          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Back to profiles
-        </button>
+        {onBack ? (
+          <button
+            onClick={onBack}
+            className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Back to profiles
+          </button>
+        ) : <span />}
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Custom Measurables</span>
       </div>
 

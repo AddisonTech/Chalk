@@ -40,7 +40,7 @@ interface Props {
   profileName?: string;
   profilePosition?: string | null;
   profileSchemeTag?: string | null;
-  onBack: () => void;
+  onBack?: () => void;
   onSaved: () => void;
 }
 
@@ -158,13 +158,15 @@ export function SchemeProfileEditor({ profileId, profileName, profilePosition, p
   return (
     <form onSubmit={handleSave} className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Back to profiles
-        </button>
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Back to profiles
+          </button>
+        ) : <span />}
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {profileId ? "Edit Profile" : "New Profile"}
         </span>
@@ -265,7 +267,9 @@ export function SchemeProfileEditor({ profileId, profileName, profilePosition, p
       {error && <p className="text-xs text-danger">{error}</p>}
 
       <div className="flex justify-end gap-2 pb-1">
-        <Button type="button" variant="ghost" size="sm" onClick={onBack} disabled={pending}>Cancel</Button>
+        {onBack && (
+          <Button type="button" variant="ghost" size="sm" onClick={onBack} disabled={pending}>Cancel</Button>
+        )}
         <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving..." : "Save profile"}</Button>
       </div>
     </form>
