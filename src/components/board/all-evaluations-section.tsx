@@ -24,6 +24,27 @@ interface Props {
   evals: EvalWithBreakdown[];
 }
 
+function worstContributor(
+  breakdown: MeasurableBreakdownRow[],
+): { label: string; score: number } | null {
+  const scored = breakdown.filter((b) => b.importance !== "ignore" && b.score != null);
+  if (!scored.length) return null;
+
+  // Prefer critical measurables below 75
+  const critBelow = scored
+    .filter((b) => b.importance === "critical" && b.score! < 75)
+    .sort((a, b) => a.score! - b.score!);
+  if (critBelow.length) return { label: critBelow[0].label, score: Math.round(critBelow[0].score!) };
+
+  // Fall back to any measurable below 60
+  const anyBelow = scored
+    .filter((b) => b.score! < 60)
+    .sort((a, b) => a.score! - b.score!);
+  if (anyBelow.length) return { label: anyBelow[0].label, score: Math.round(anyBelow[0].score!) };
+
+  return null;
+}
+
 function scoreColor(score: number | null): string {
   if (score == null) return "text-muted-foreground";
   if (score >= 75) return "text-success";
@@ -136,24 +157,35 @@ export function AllEvaluationsSection({ recruitId, evals }: Props) {
                   </button>
 
                   {/* Profile name + tags */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-foreground truncate">
-                        {e.profile_name ?? "Unknown profile"}
-                      </span>
-                      {e.is_primary && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-accent">
-                          <Star className="h-2.5 w-2.5 fill-current" />
-                          primary
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      {e.profile_position && <span>{e.profile_position}</span>}
-                      {e.profile_position && e.profile_scheme_tag && <span>·</span>}
-                      {e.profile_scheme_tag && <span>{e.profile_scheme_tag}</span>}
-                    </div>
-                  </div>
+                  {(() => {
+                    const worst = worstContributor(e.breakdown);
+                    return (
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {e.profile_name ?? "Unknown profile"}
+                          </span>
+                          {e.is_primary && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-accent">
+                              <Star className="h-2.5 w-2.5 fill-current" />
+                              primary
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                          {e.profile_position && <span>{e.profile_position}</span>}
+                          {e.profile_position && e.profile_scheme_tag && <span>·</span>}
+                          {e.profile_scheme_tag && <span>{e.profile_scheme_tag}</span>}
+                        </div>
+                        {worst && (
+                          <div className="mt-0.5 text-[10px] text-muted-foreground">
+                            <span className="text-amber-500">{worst.label}</span>
+                            <span className="ml-1">{worst.score}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Score */}
                   <span className={`font-mono text-base font-semibold tabular-nums ${scoreColor(e.calculated_score)}`}>
