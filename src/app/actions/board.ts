@@ -72,7 +72,7 @@ export async function getRecruits(sortBy: "name" | "tier" | "scheme_fit_score" |
 
   const { data } = await supabase
     .from("recruits")
-    .select("id, name, position, class_year, high_school, state, tier, scheme_fit_score, offer_status, height, weight, forty_yard, vertical, bench_reps, priority")
+    .select("id, name, position, class_year, high_school, state, tier, scheme_fit_score, calculated_scheme_fit, offer_status, height, weight, forty_yard, vertical, bench_reps, priority")
     .eq("team_id", teamId)
     .order(sortBy === "scheme_fit_score" ? "scheme_fit_score" : sortBy, {
       ascending: sortBy !== "scheme_fit_score",
