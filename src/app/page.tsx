@@ -86,7 +86,7 @@ export default async function Landing() {
             className="hero-animate mt-7 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed text-muted-foreground"
             style={{ animation: "fade-up 0.6s ease 0.16s both" }}
           >
-            Chalk is a football intelligence platform built for high school and small college coaches.
+            Chalk is a football intelligence platform built for coaches at any level.
             Tag plays from film, watch tendency reports build themselves, and turn Monday prep
             into a game-ready plan in under two hours. No analytics department required.
           </p>
@@ -350,7 +350,7 @@ export default async function Landing() {
                 The coaching staff of two.
               </h2>
               <p className="mt-5 text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
-                High school and small college programs don&apos;t have 40-person analytics departments.
+                Most programs don&apos;t have 40-person analytics departments.
                 Chalk gives your staff the tools those departments use, without needing the staff to run them.
               </p>
             </div>
@@ -365,8 +365,8 @@ export default async function Landing() {
               },
               {
                 Icon: Target,
-                title: "High school staffs",
-                body: "Friday night programs where the same coach handles game planning, recruiting calls, and film review.",
+                title: "Any size staff",
+                body: "From Friday night programs to mid-majors, where the same coach handles game planning, recruiting calls, and film review.",
               },
               {
                 Icon: Zap,
