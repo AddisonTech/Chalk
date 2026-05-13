@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TendencyReport } from "./tendency-report";
 import { PlayTaggingView } from "./play-tagging-view";
+import { ScoutingReport } from "./scouting-report";
 
 type Play = {
   id: string;
@@ -28,6 +29,7 @@ interface Props {
 
 const TABS = [
   { key: "tendency", label: "Tendency Report" },
+  { key: "scouting", label: "Scouting Report" },
   { key: "plays", label: "Tagged Plays" },
 ] as const;
 
@@ -55,7 +57,8 @@ export function GameDetailClient({ gameId, opponentName, plays }: Props) {
         ))}
       </div>
 
-      {tab === "tendency" && <TendencyReport opponentName={opponentName} />}
+      {tab === "tendency" && <TendencyReport opponentName={opponentName} plays={plays} />}
+      {tab === "scouting" && <ScoutingReport gameId={gameId} opponentName={opponentName} />}
       {tab === "plays" && <PlayTaggingView gameId={gameId} plays={plays} />}
     </div>
   );
