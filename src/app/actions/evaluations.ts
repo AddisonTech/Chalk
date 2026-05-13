@@ -13,6 +13,16 @@ import {
 
 type DBClient = Awaited<ReturnType<typeof createClient>>;
 
+async function batchedAll<T>(
+  items: T[],
+  fn: (item: T) => Promise<unknown>,
+  batchSize = 10,
+): Promise<void> {
+  for (let i = 0; i < items.length; i += batchSize) {
+    await Promise.all(items.slice(i, i + batchSize).map(fn));
+  }
+}
+
 async function getTeamId() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -151,10 +161,8 @@ export async function recalculateRecruitEvaluations(recruitId: string) {
 
   if (!evals?.length) return { updated: 0 };
 
-  await Promise.all(
-    evals.map((e) =>
-      computeAndSaveOne(supabase, teamId, recruitId, e.scheme_profile_id, e.is_primary),
-    ),
+  await batchedAll(evals, (e) =>
+    computeAndSaveOne(supabase, teamId, recruitId, e.scheme_profile_id, e.is_primary),
   );
 
   revalidatePath("/board");
@@ -174,10 +182,8 @@ export async function recalculateProfileEvaluations(profileId: string) {
 
   if (!evals?.length) return { updated: 0 };
 
-  await Promise.all(
-    evals.map((e) =>
-      computeAndSaveOne(supabase, teamId, e.recruit_id, profileId, e.is_primary),
-    ),
+  await batchedAll(evals, (e) =>
+    computeAndSaveOne(supabase, teamId, e.recruit_id, profileId, e.is_primary),
   );
 
   for (const e of evals) {
@@ -198,10 +204,8 @@ export async function recalculateAllEvaluations() {
 
   if (!evals?.length) return { updated: 0 };
 
-  await Promise.all(
-    evals.map((e) =>
-      computeAndSaveOne(supabase, teamId, e.recruit_id, e.scheme_profile_id, e.is_primary),
-    ),
+  await batchedAll(evals, (e) =>
+    computeAndSaveOne(supabase, teamId, e.recruit_id, e.scheme_profile_id, e.is_primary),
   );
 
   const recruitIds = [...new Set(evals.map((e) => e.recruit_id))];
