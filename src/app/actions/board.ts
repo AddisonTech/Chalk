@@ -30,6 +30,13 @@ export async function createRecruit(formData: FormData) {
   const schemeFit = formData.get("scheme_fit_score") ? parseFloat(formData.get("scheme_fit_score") as string) : null;
   const notes = (formData.get("notes") as string)?.trim() || null;
 
+  const height = (formData.get("height") as string)?.trim() || null;
+  const weight = formData.get("weight") ? parseInt(formData.get("weight") as string, 10) : null;
+  const fortyYard = formData.get("forty_yard") ? parseFloat(formData.get("forty_yard") as string) : null;
+  const vertical = formData.get("vertical") ? parseFloat(formData.get("vertical") as string) : null;
+  const benchReps = formData.get("bench_reps") ? parseInt(formData.get("bench_reps") as string, 10) : null;
+  const priority = formData.get("priority") ? parseInt(formData.get("priority") as string, 10) : null;
+
   const { data: recruit, error } = await supabase
     .from("recruits")
     .insert({
@@ -43,6 +50,12 @@ export async function createRecruit(formData: FormData) {
       tier,
       scheme_fit_score: schemeFit,
       notes,
+      height,
+      weight,
+      forty_yard: fortyYard,
+      vertical,
+      bench_reps: benchReps,
+      priority,
     })
     .select("id")
     .single();
@@ -59,7 +72,7 @@ export async function getRecruits(sortBy: "name" | "tier" | "scheme_fit_score" |
 
   const { data } = await supabase
     .from("recruits")
-    .select("id, name, position, class_year, high_school, state, tier, scheme_fit_score, offer_status")
+    .select("id, name, position, class_year, high_school, state, tier, scheme_fit_score, offer_status, height, weight, forty_yard, vertical, bench_reps, priority")
     .eq("team_id", teamId)
     .order(sortBy === "scheme_fit_score" ? "scheme_fit_score" : sortBy, {
       ascending: sortBy !== "scheme_fit_score",

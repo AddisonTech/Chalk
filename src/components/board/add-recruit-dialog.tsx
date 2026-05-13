@@ -47,7 +47,9 @@ export function AddRecruitDialog({ open, onClose }: Props) {
 
   return (
     <Dialog open={open} onClose={onClose} title="Add Recruit" className="max-w-lg">
-      <form onSubmit={submit} className="flex flex-col gap-4">
+      <form onSubmit={submit} className="flex flex-col gap-5">
+
+        {/* Identity */}
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2 flex flex-col gap-1.5">
             <Label>Full name</Label>
@@ -96,16 +98,59 @@ export function AddRecruitDialog({ open, onClose }: Props) {
             <Label>Scheme fit (0-100)</Label>
             <Input name="scheme_fit_score" type="number" min={0} max={100} placeholder="72" />
           </div>
+        </div>
 
-          <div className="col-span-2 flex flex-col gap-1.5">
-            <Label>Notes</Label>
-            <textarea
-              name="notes"
-              rows={2}
-              placeholder="Quick off the line, good hands..."
-              className="w-full rounded-sm border border-border-strong bg-surface px-3 py-2.5 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-            />
+        {/* Measurables */}
+        <div>
+          <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Measurables</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Height</Label>
+              <Input name="height" placeholder={`6'2"`} />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Weight (lbs)</Label>
+              <Input name="weight" type="number" min={140} max={380} placeholder="195" />
+            </div>
           </div>
+        </div>
+
+        {/* Combine */}
+        <div>
+          <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Combine</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>40-yard dash</Label>
+              <Input name="forty_yard" type="number" min={4.0} max={6.0} step={0.01} placeholder="4.55" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Vertical (inches)</Label>
+              <Input name="vertical" type="number" min={20} max={50} step={0.5} placeholder="35.0" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Bench reps (225 lbs)</Label>
+              <Input name="bench_reps" type="number" min={0} max={60} placeholder="12" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Position rank</Label>
+              <Input name="priority" type="number" min={1} placeholder="5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="flex flex-col gap-1.5">
+          <Label>Notes</Label>
+          <textarea
+            name="notes"
+            rows={2}
+            placeholder="Quick off the line, good hands..."
+            className="w-full resize-none rounded-sm border border-border-strong bg-surface px-3 py-2.5 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
         </div>
 
         {error && <p className="text-xs text-danger" role="alert">{error}</p>}

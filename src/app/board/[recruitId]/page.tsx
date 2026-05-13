@@ -48,12 +48,28 @@ function Field({ label, value }: { label: string; value: string | number | null 
   );
 }
 
+function Stat({ label, value, unit }: { label: string; value: string | number | null | undefined; unit?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      {value != null && value !== "" ? (
+        <span className="font-mono text-xl font-semibold tabular-nums text-foreground">
+          {value}{unit ?? ""}
+        </span>
+      ) : (
+        <span className="font-mono text-xl font-semibold text-muted-foreground">-</span>
+      )}
+    </div>
+  );
+}
+
 export default async function RecruitDetail({ params }: Props) {
   const { recruitId } = await params;
   const r = await getRecruit(recruitId);
   if (!r) notFound();
 
   const hasGrades = r.film_grade != null || r.athleticism_grade != null || r.technique_grade != null || r.football_iq_grade != null;
+  const hasMeasurables = r.forty_yard != null || r.vertical != null || r.bench_reps != null || r.shuttle != null || r.broad_jump != null;
   const location = [r.city, r.state].filter(Boolean).join(", ");
 
   return (
@@ -77,6 +93,7 @@ export default async function RecruitDetail({ params }: Props) {
 
             {/* Main info */}
             <div className="col-span-2 flex flex-col gap-5">
+
               <div className="rounded-sm border border-border bg-surface p-5">
                 <div className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Profile</div>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4">
@@ -88,6 +105,19 @@ export default async function RecruitDetail({ params }: Props) {
                   <Field label="Weight" value={r.weight ? `${r.weight} lbs` : null} />
                 </div>
               </div>
+
+              {hasMeasurables && (
+                <div className="rounded-sm border border-border bg-surface p-5">
+                  <div className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Testing & Measurables</div>
+                  <div className="grid grid-cols-3 gap-x-6 gap-y-5 sm:grid-cols-5">
+                    <Stat label="40-yd dash" value={r.forty_yard} unit="s" />
+                    <Stat label="Vertical" value={r.vertical} unit='"' />
+                    <Stat label="Bench reps" value={r.bench_reps} />
+                    <Stat label="Shuttle" value={r.shuttle} unit="s" />
+                    <Stat label="Broad jump" value={r.broad_jump} unit='"' />
+                  </div>
+                </div>
+              )}
 
               {(r.strengths || r.weaknesses || r.development_notes || r.notes) && (
                 <div className="rounded-sm border border-border bg-surface p-5">
@@ -105,6 +135,12 @@ export default async function RecruitDetail({ params }: Props) {
                         <p className="text-sm leading-relaxed text-foreground">{r.weaknesses}</p>
                       </div>
                     )}
+                    {r.development_notes && (
+                      <div>
+                        <div className="mb-1 text-xs text-muted-foreground">Development notes</div>
+                        <p className="text-sm leading-relaxed text-foreground">{r.development_notes}</p>
+                      </div>
+                    )}
                     {r.notes && (
                       <div>
                         <div className="mb-1 text-xs text-muted-foreground">Notes</div>
@@ -115,41 +151,11 @@ export default async function RecruitDetail({ params }: Props) {
                 </div>
               )}
 
-              {(r.forty_yard || r.shuttle || r.vertical || r.broad_jump) && (
-                <div className="rounded-sm border border-border bg-surface p-5">
-                  <div className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Testing</div>
-                  <div className="grid grid-cols-4 gap-4">
-                    {r.forty_yard && (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">40-yd dash</span>
-                        <span className="text-xl font-semibold tabular-nums text-foreground">{r.forty_yard}s</span>
-                      </div>
-                    )}
-                    {r.shuttle && (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Shuttle</span>
-                        <span className="text-xl font-semibold tabular-nums text-foreground">{r.shuttle}s</span>
-                      </div>
-                    )}
-                    {r.vertical && (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Vertical</span>
-                        <span className="text-xl font-semibold tabular-nums text-foreground">{r.vertical}"</span>
-                      </div>
-                    )}
-                    {r.broad_jump && (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Broad jump</span>
-                        <span className="text-xl font-semibold tabular-nums text-foreground">{r.broad_jump}"</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Sidebar */}
             <div className="flex flex-col gap-5">
+
               <div className="rounded-sm border border-border bg-surface p-5">
                 <div className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Evaluation</div>
                 <div className="flex flex-col gap-3">
@@ -159,6 +165,12 @@ export default async function RecruitDetail({ params }: Props) {
                       <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${TIER_COLORS[r.tier] ?? ""}`}>
                         {TIER_LABELS[r.tier] ?? r.tier}
                       </span>
+                    </div>
+                  )}
+                  {r.priority != null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Position rank</span>
+                      <span className="font-mono text-sm font-semibold text-accent">#{r.priority}</span>
                     </div>
                   )}
                   {r.scheme_fit_score != null && (
@@ -177,7 +189,7 @@ export default async function RecruitDetail({ params }: Props) {
                   {r.offer_status && r.offer_status !== "not_offered" && (
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Status</span>
-                      <span className="text-xs capitalize text-foreground">{r.offer_status.replace("_", " ")}</span>
+                      <span className="text-xs capitalize text-foreground">{r.offer_status.replace(/_/g, " ")}</span>
                     </div>
                   )}
                 </div>
@@ -201,6 +213,7 @@ export default async function RecruitDetail({ params }: Props) {
                   <p className="text-sm text-foreground">{r.player_comp}</p>
                 </div>
               )}
+
             </div>
 
           </div>
