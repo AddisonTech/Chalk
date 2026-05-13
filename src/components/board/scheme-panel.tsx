@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { X, Plus, Pencil, Settings2, ChevronRight } from "lucide-react";
+import { X, Plus, Pencil, Settings2, ChevronRight, RefreshCw, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSchemeProfiles, deleteSchemeProfile } from "@/app/actions/scheme-profiles";
+import { recalculateAllEvaluations } from "@/app/actions/evaluations";
 import { SchemeProfileEditor } from "@/components/board/scheme-profile-editor";
 import { CustomMeasurablesManager } from "@/components/board/custom-measurables-manager";
 
@@ -11,6 +12,8 @@ type View =
   | { type: "list" }
   | { type: "editor"; profileId: string | null; name?: string; position?: string | null; schemeTag?: string | null }
   | { type: "custom-measurables" };
+
+type RecalcState = "idle" | "confirm" | "running" | "done";
 
 interface SchemeProfile {
   id: string;
@@ -28,6 +31,7 @@ export function SchemePanel({ open, onClose }: Props) {
   const [view, setView] = useState<View>({ type: "list" });
   const [profiles, setProfiles] = useState<SchemeProfile[]>([]);
   const [pending, startTransition] = useTransition();
+  const [recalcState, setRecalcState] = useState<RecalcState>("idle");
 
   function loadProfiles() {
     startTransition(async () => {
@@ -40,6 +44,7 @@ export function SchemePanel({ open, onClose }: Props) {
     if (open) {
       loadProfiles();
       setView({ type: "list" });
+      setRecalcState("idle");
     }
   }, [open]);
 
@@ -48,6 +53,18 @@ export function SchemePanel({ open, onClose }: Props) {
       await deleteSchemeProfile(id);
       loadProfiles();
     });
+  }
+
+  function handleRecalcAll() {
+    if (recalcState === "idle") { setRecalcState("confirm"); return; }
+    if (recalcState === "confirm") {
+      setRecalcState("running");
+      startTransition(async () => {
+        await recalculateAllEvaluations();
+        setRecalcState("done");
+        setTimeout(() => setRecalcState("idle"), 2000);
+      });
+    }
   }
 
   return (
@@ -67,12 +84,54 @@ export function SchemePanel({ open, onClose }: Props) {
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <span className="text-sm font-semibold text-foreground">Scheme Profiles</span>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            {view.type === "list" && (
+              <>
+                {recalcState === "confirm" ? (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Recalculate all?</span>
+                    <button
+                      onClick={handleRecalcAll}
+                      className="text-accent hover:underline"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setRecalcState("idle")}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleRecalcAll}
+                    disabled={recalcState === "running" || pending}
+                    title="Recalculate all evaluations"
+                    className={`flex items-center gap-1 rounded p-1 text-xs transition-colors disabled:opacity-40 ${
+                      recalcState === "done"
+                        ? "text-success"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {recalcState === "running" ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : recalcState === "done" ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                )}
+              </>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
