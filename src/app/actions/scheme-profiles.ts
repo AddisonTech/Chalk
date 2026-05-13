@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { recalculateProfileEvaluations } from "@/app/actions/evaluations";
 
 async function getTeamId() {
   const supabase = await createClient();
@@ -139,6 +140,9 @@ export async function saveProfileMeasurables(
     .insert(rows);
 
   if (insError) return { error: insError.message };
+
+  // Refresh scores for every recruit already evaluated against this profile
+  await recalculateProfileEvaluations(profileId);
 
   revalidatePath("/board");
   return { ok: true };
