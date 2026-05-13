@@ -21,14 +21,19 @@ export async function startDemoSession(): Promise<{ error: string } | never> {
     return { error: createError?.message ?? "Could not create demo account" };
   }
 
-  // Admin-created users bypass the on_auth_user_created trigger, so create
-  // the profile and join the demo team explicitly.
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: data.user.id,
-    team_id: "00000000-0000-0000-0000-000000000001",
-    full_name: "",
-    role: "head_coach",
-  });
+  // The on_auth_user_created trigger fires even for admin-created users and
+  // creates the profile. Upsert here as a safety net in case the trigger
+  // races or is missing; ignoreDuplicates means it's a no-op if the row
+  // already exists.
+  const { error: profileError } = await admin.from("profiles").upsert(
+    {
+      id: data.user.id,
+      team_id: "00000000-0000-0000-0000-000000000001",
+      full_name: "",
+      role: "head_coach",
+    },
+    { onConflict: "id", ignoreDuplicates: true }
+  );
 
   if (profileError) {
     await admin.auth.admin.deleteUser(data.user.id);
