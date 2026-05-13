@@ -62,6 +62,8 @@ const profiles = [
     name: "Cover 3 CB",
     position: "CB",
     scheme_tag: "Cover 3",
+    recruit: "DeShawn Carter",
+    is_primary: true,
     measurables: [
       { measurable_key: "height",            importance: "critical",     target_value: 71, range_min: 69, range_max: 73 },
       { measurable_key: "weight",            importance: "nice_to_have", target_value: 190, range_min: 175, range_max: 205 },
@@ -74,12 +76,13 @@ const profiles = [
       { measurable_key: "athleticism_grade", importance: "nice_to_have", target_value: 7.0, range_min: 5.0, range_max: 10.0 },
       { measurable_key: "football_iq_grade", importance: "nice_to_have", target_value: 6.5, range_min: 5.0, range_max: 10.0 },
     ],
-    recruit: "DeShawn Carter",
   },
   {
     name: "Spread Slot WR",
     position: "WR",
     scheme_tag: "Spread",
+    recruit: "Marcus Hayes",
+    is_primary: true,
     measurables: [
       { measurable_key: "height",            importance: "nice_to_have", target_value: 72, range_min: 69, range_max: 75 },
       { measurable_key: "weight",            importance: "nice_to_have", target_value: 190, range_min: 175, range_max: 210 },
@@ -92,12 +95,13 @@ const profiles = [
       { measurable_key: "technique_grade",   importance: "nice_to_have", target_value: 7.0, range_min: 5.0, range_max: 10.0 },
       { measurable_key: "football_iq_grade", importance: "nice_to_have", target_value: 7.0, range_min: 5.0, range_max: 10.0 },
     ],
-    recruit: "Marcus Hayes",
   },
   {
     name: "Pro-Style QB",
     position: "QB",
     scheme_tag: "Pro-Style",
+    recruit: "Tyler Brooks",
+    is_primary: true,
     measurables: [
       { measurable_key: "height",            importance: "critical",     target_value: 75, range_min: 73, range_max: 78 },
       { measurable_key: "weight",            importance: "nice_to_have", target_value: 215, range_min: 200, range_max: 235 },
@@ -107,12 +111,13 @@ const profiles = [
       { measurable_key: "football_iq_grade", importance: "critical",     target_value: 8.5, range_min: 5.0, range_max: 10.0 },
       { measurable_key: "athleticism_grade", importance: "nice_to_have", target_value: 7.0, range_min: 5.0, range_max: 10.0 },
     ],
-    recruit: "Tyler Brooks",
   },
   {
     name: "3-4 Edge OLB",
     position: "OLB",
     scheme_tag: "3-4",
+    recruit: "Jordan Reed",
+    is_primary: true,
     measurables: [
       { measurable_key: "height",            importance: "critical",     target_value: 74, range_min: 72, range_max: 77 },
       { measurable_key: "weight",            importance: "critical",     target_value: 240, range_min: 225, range_max: 260 },
@@ -124,7 +129,22 @@ const profiles = [
       { measurable_key: "technique_grade",   importance: "nice_to_have", target_value: 6.5, range_min: 5.0, range_max: 10.0 },
       { measurable_key: "football_iq_grade", importance: "nice_to_have", target_value: 6.5, range_min: 5.0, range_max: 10.0 },
     ],
-    recruit: "Jordan Reed",
+  },
+  {
+    // West Coast QB - values mobile QBs with quick processing; Tyler's 40 time hurts him here
+    name: "West Coast QB",
+    position: "QB",
+    scheme_tag: "West Coast",
+    recruit: "Tyler Brooks",
+    is_primary: false,
+    measurables: [
+      { measurable_key: "height",            importance: "nice_to_have", target_value: 74, range_min: 71, range_max: 77 },
+      { measurable_key: "forty_yard",        importance: "critical",     target_value: 4.65, range_min: 4.50, range_max: 4.80 },
+      { measurable_key: "film_grade",        importance: "critical",     target_value: 8.0, range_min: 5.0, range_max: 10.0 },
+      { measurable_key: "football_iq_grade", importance: "critical",     target_value: 8.0, range_min: 5.0, range_max: 10.0 },
+      { measurable_key: "athleticism_grade", importance: "nice_to_have", target_value: 7.0, range_min: 5.0, range_max: 10.0 },
+      { measurable_key: "technique_grade",   importance: "nice_to_have", target_value: 7.5, range_min: 5.0, range_max: 10.0 },
+    ],
   },
 ];
 
@@ -211,7 +231,7 @@ for (const p of profiles) {
         scheme_profile_id: prof.id,
         calculated_score: score,
         last_calculated_at: new Date().toISOString(),
-        is_primary: true,
+        is_primary: p.is_primary,
       },
       { onConflict: "recruit_id,scheme_profile_id" },
     );
@@ -221,15 +241,17 @@ for (const p of profiles) {
     continue;
   }
 
-  const { error: fitErr } = await admin
-    .from("recruits")
-    .update({ calculated_scheme_fit: score })
-    .eq("id", recruit.id);
+  if (p.is_primary) {
+    const { error: fitErr } = await admin
+      .from("recruits")
+      .update({ calculated_scheme_fit: score })
+      .eq("id", recruit.id);
 
-  if (fitErr) {
-    console.error(`  FAIL update calculated_scheme_fit: ${fitErr.message}`);
-  } else {
-    console.log(`  Updated ${recruit.name}.calculated_scheme_fit = ${score}`);
+    if (fitErr) {
+      console.error(`  FAIL update calculated_scheme_fit: ${fitErr.message}`);
+    } else {
+      console.log(`  Updated ${recruit.name}.calculated_scheme_fit = ${score}`);
+    }
   }
 }
 

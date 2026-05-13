@@ -13,8 +13,9 @@ import {
   STANDARD_MEASURABLE_LABELS,
   type MeasurableConfig,
   type Importance,
-  type MeasurableBreakdownRow,
 } from "@/lib/scoring";
+import { RecalculateButton } from "@/components/board/recalculate-button";
+import { AllEvaluationsSection, type EvalWithBreakdown } from "@/components/board/all-evaluations-section";
 
 interface Props {
   params: Promise<{ recruitId: string }>;
@@ -77,7 +78,8 @@ function Stat({ label, value, unit }: { label: string; value: string | number | 
 
 export default async function RecruitDetail({ params }: Props) {
   const { recruitId } = await params;
-  const [r, evaluations] = await Promise.all([
+
+  const [r, rawEvals] = await Promise.all([
     getRecruit(recruitId),
     getRecruitEvaluations(recruitId),
   ]);
@@ -87,42 +89,49 @@ export default async function RecruitDetail({ params }: Props) {
   const hasMeasurables = r.forty_yard != null || r.vertical != null || r.bench_reps != null || r.shuttle != null || r.broad_jump != null;
   const location = [r.city, r.state].filter(Boolean).join(", ");
 
-  type EvalRow = {
+  type RawEval = {
     id: string;
     calculated_score: number | null;
+    last_calculated_at: string | null;
     is_primary: boolean;
     scheme_profile_id: string;
     scheme_profiles: { name: string | null; position: string | null; scheme_tag: string | null } | null;
   };
-  const typedEvals = evaluations as unknown as EvalRow[];
-  const primaryEval = typedEvals.find((e) => e.is_primary) ?? typedEvals[0] ?? null;
+  const typedEvals = rawEvals as unknown as RawEval[];
 
-  let breakdown: MeasurableBreakdownRow[] | null = null;
-  let primaryProfileName: string | null = null;
-  let missingCriticalCount = 0;
+  // Fetch profile measurables for all evals + custom values in parallel
+  const [customValues, ...allProfileMeasurables] = await Promise.all([
+    getRecruitCustomValues(recruitId),
+    ...typedEvals.map((e) => getProfileMeasurables(e.scheme_profile_id)),
+  ]);
 
-  if (primaryEval) {
-    primaryProfileName = primaryEval.scheme_profiles?.name ?? null;
-    const [profileMeasurables, customValues] = await Promise.all([
-      getProfileMeasurables(primaryEval.scheme_profile_id),
-      getRecruitCustomValues(recruitId),
-    ]);
+  const customValueMap = new Map<string, number | null>(
+    (customValues as { custom_measurable_id: string; value_numeric: number | null }[])
+      .map((v) => [v.custom_measurable_id, v.value_numeric])
+  );
 
-    type ProfMeasRow = {
-      measurable_key: string | null;
-      custom_measurable_id: string | null;
-      importance: string;
-      target_value: number | null;
-      range_min: number | null;
-      range_max: number | null;
-    };
+  type ProfMeasRow = {
+    measurable_key: string | null;
+    custom_measurable_id: string | null;
+    importance: string;
+    target_value: number | null;
+    range_min: number | null;
+    range_max: number | null;
+  };
 
-    const customValueMap = new Map<string, number | null>(
-      (customValues as { custom_measurable_id: string; value_numeric: number | null }[])
-        .map((v) => [v.custom_measurable_id, v.value_numeric])
-    );
+  function getRecruitValue(key: string): number | null {
+    if ((STANDARD_MEASURABLE_KEYS as readonly string[]).includes(key)) {
+      if (key === "height") return parseHeightToInches(r!.height);
+      const val = (r as Record<string, unknown>)[key];
+      return typeof val === "number" ? val : null;
+    }
+    const cv = customValueMap.get(key);
+    return cv !== undefined ? cv : null;
+  }
 
-    const configs: MeasurableConfig[] = (profileMeasurables as ProfMeasRow[]).map((m) => ({
+  const evalsWithBreakdown: EvalWithBreakdown[] = typedEvals.map((e, i) => {
+    const measurables = allProfileMeasurables[i] as ProfMeasRow[];
+    const configs: MeasurableConfig[] = measurables.map((m) => ({
       key: m.measurable_key ?? m.custom_measurable_id ?? "",
       label: m.measurable_key
         ? STANDARD_MEASURABLE_LABELS[m.measurable_key as typeof STANDARD_MEASURABLE_KEYS[number]] ?? m.measurable_key
@@ -133,21 +142,28 @@ export default async function RecruitDetail({ params }: Props) {
       rangeMax: m.range_max,
       isCustom: !m.measurable_key,
     }));
-
-    function getRecruitValue(key: string): number | null {
-      if ((STANDARD_MEASURABLE_KEYS as readonly string[]).includes(key)) {
-        if (key === "height") return parseHeightToInches(r!.height);
-        const val = (r as Record<string, unknown>)[key];
-        return typeof val === "number" ? val : null;
-      }
-      const cv = customValueMap.get(key);
-      return cv !== undefined ? cv : null;
-    }
-
     const result = computeSchemeScore(configs, getRecruitValue);
-    breakdown = result.breakdown;
-    missingCriticalCount = result.missingCriticalCount;
-  }
+    return {
+      id: e.id,
+      calculated_score: e.calculated_score,
+      last_calculated_at: e.last_calculated_at,
+      is_primary: e.is_primary,
+      scheme_profile_id: e.scheme_profile_id,
+      profile_name: e.scheme_profiles?.name ?? null,
+      profile_position: e.scheme_profiles?.position ?? null,
+      profile_scheme_tag: e.scheme_profiles?.scheme_tag ?? null,
+      breakdown: result.breakdown,
+      missingCriticalCount: result.missingCriticalCount,
+    };
+  });
+
+  const primaryEvalData = evalsWithBreakdown.find((e) => e.is_primary) ?? evalsWithBreakdown[0] ?? null;
+
+  const lastCalculatedAt = typedEvals.reduce<string | null>((max, e) => {
+    if (!e.last_calculated_at) return max;
+    if (!max) return e.last_calculated_at;
+    return e.last_calculated_at > max ? e.last_calculated_at : max;
+  }, null);
 
   return (
     <>
@@ -168,7 +184,7 @@ export default async function RecruitDetail({ params }: Props) {
         <div className="mx-auto w-full max-w-4xl px-8 py-10">
           <div className="grid grid-cols-3 gap-5">
 
-            {/* Main info */}
+            {/* Main content */}
             <div className="col-span-2 flex flex-col gap-5">
 
               <div className="rounded-sm border border-border bg-surface p-5">
@@ -228,22 +244,26 @@ export default async function RecruitDetail({ params }: Props) {
                 </div>
               )}
 
-              {breakdown && breakdown.filter((b) => b.importance !== "ignore").length > 0 && (
+              {/* Primary scheme fit breakdown */}
+              {primaryEvalData && primaryEvalData.breakdown.filter((b) => b.importance !== "ignore").length > 0 && (
                 <div className="rounded-sm border border-border bg-surface p-5">
-                  <div className="mb-1 flex items-center justify-between">
-                    <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Scheme Fit Breakdown
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Scheme Fit Breakdown
+                      </span>
+                      {primaryEvalData.profile_name && (
+                        <span className="text-[10px] text-muted-foreground">{primaryEvalData.profile_name}</span>
+                      )}
                     </div>
-                    {primaryProfileName && (
-                      <span className="text-[10px] text-muted-foreground">{primaryProfileName}</span>
-                    )}
+                    <RecalculateButton recruitId={recruitId} lastCalculatedAt={lastCalculatedAt} />
                   </div>
-                  {missingCriticalCount > 0 && (
-                    <p className="mb-3 mt-2 text-[11px] text-amber-500">
-                      {missingCriticalCount} critical measurable{missingCriticalCount > 1 ? "s" : ""} missing data
+                  {primaryEvalData.missingCriticalCount > 0 && (
+                    <p className="mb-3 text-[11px] text-amber-500">
+                      {primaryEvalData.missingCriticalCount} critical measurable{primaryEvalData.missingCriticalCount > 1 ? "s" : ""} missing data
                     </p>
                   )}
-                  <div className="mt-4 overflow-hidden rounded-sm border border-border">
+                  <div className="overflow-hidden rounded-sm border border-border">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-border bg-surface">
@@ -255,7 +275,7 @@ export default async function RecruitDetail({ params }: Props) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-background">
-                        {breakdown
+                        {primaryEvalData.breakdown
                           .filter((b) => b.importance !== "ignore")
                           .map((b) => (
                             <tr key={b.key}>
@@ -297,28 +317,9 @@ export default async function RecruitDetail({ params }: Props) {
                 </div>
               )}
 
-              {typedEvals.length > 1 && (
-                <div className="rounded-sm border border-border bg-surface p-5">
-                  <div className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">All Evaluations</div>
-                  <div className="flex flex-col divide-y divide-border overflow-hidden rounded-sm border border-border">
-                    {typedEvals.map((e) => (
-                      <div key={e.id} className="flex items-center justify-between px-3 py-2.5">
-                        <div>
-                          <span className="text-xs text-foreground">{e.scheme_profiles?.name ?? "Unknown profile"}</span>
-                          {e.is_primary && (
-                            <span className="ml-2 text-[10px] text-accent">primary</span>
-                          )}
-                        </div>
-                        <span className={`font-mono text-xs font-semibold ${
-                          e.calculated_score != null && e.calculated_score >= 75 ? "text-success" :
-                          e.calculated_score != null && e.calculated_score >= 50 ? "text-foreground" : "text-muted-foreground"
-                        }`}>
-                          {e.calculated_score ?? "-"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {/* All evaluations (always shown if at least one eval exists) */}
+              {evalsWithBreakdown.length > 0 && (
+                <AllEvaluationsSection recruitId={recruitId} evals={evalsWithBreakdown} />
               )}
 
             </div>
@@ -356,18 +357,24 @@ export default async function RecruitDetail({ params }: Props) {
                       </div>
                     </div>
                   )}
-                  {primaryEval?.calculated_score != null && (
+                  {primaryEvalData?.calculated_score != null && (
                     <div>
                       <div className="mb-1.5 flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">
-                          {primaryProfileName ? `${primaryProfileName}` : "Calc. scheme fit"}
+                          {primaryEvalData.profile_name ?? "Calc. scheme fit"}
                         </span>
-                        <span className={`font-mono font-semibold ${primaryEval.calculated_score >= 75 ? "text-success" : primaryEval.calculated_score >= 50 ? "text-foreground" : "text-muted-foreground"}`}>
-                          {primaryEval.calculated_score}
+                        <span className={`font-mono font-semibold ${
+                          primaryEvalData.calculated_score >= 75 ? "text-success" :
+                          primaryEvalData.calculated_score >= 50 ? "text-foreground" : "text-muted-foreground"
+                        }`}>
+                          {primaryEvalData.calculated_score}
                         </span>
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-raised">
-                        <div className="h-full rounded-full bg-success/70" style={{ width: `${primaryEval.calculated_score}%` }} />
+                        <div
+                          className="h-full rounded-full bg-success/70"
+                          style={{ width: `${primaryEvalData.calculated_score}%` }}
+                        />
                       </div>
                     </div>
                   )}
