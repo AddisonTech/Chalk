@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { upsertRecruitCustomValues } from "@/app/actions/custom-measurables";
 
 async function getTeamId() {
   const supabase = await createClient();
@@ -61,6 +62,20 @@ export async function createRecruit(formData: FormData) {
     .single();
 
   if (error || !recruit) return { error: error?.message ?? "Failed to add recruit" };
+
+  const customValues: Array<{ custom_measurable_id: string; value_numeric: number | null }> = [];
+  for (const [key, val] of formData.entries()) {
+    if (key.startsWith("custom_")) {
+      const id = key.slice("custom_".length);
+      const num = val !== "" ? parseFloat(val as string) : null;
+      if (num != null && !isNaN(num)) {
+        customValues.push({ custom_measurable_id: id, value_numeric: num });
+      }
+    }
+  }
+  if (customValues.length > 0) {
+    await upsertRecruitCustomValues(recruit.id, customValues);
+  }
 
   revalidatePath("/board");
   return { recruitId: recruit.id };

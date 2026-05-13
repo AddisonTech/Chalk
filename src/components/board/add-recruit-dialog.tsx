@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createRecruit } from "@/app/actions/board";
+import { getCustomMeasurables } from "@/app/actions/custom-measurables";
 
 const POSITIONS = ["QB","RB","FB","WR","TE","OT","OG","C","DE","DT","ILB","OLB","CB","S","K","P","LS"];
 const TIERS = [
@@ -15,6 +16,12 @@ const TIERS = [
   { value: "watch", label: "Watch" },
   { value: "pass", label: "Pass" },
 ];
+
+interface CustomMeasurable {
+  id: string;
+  name: string;
+  unit: string | null;
+}
 
 interface Props {
   open: boolean;
@@ -25,6 +32,13 @@ export function AddRecruitDialog({ open, onClose }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [customMeasurables, setCustomMeasurables] = useState<CustomMeasurable[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      getCustomMeasurables().then((data) => setCustomMeasurables(data as CustomMeasurable[]));
+    }
+  }, [open]);
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -141,6 +155,26 @@ export function AddRecruitDialog({ open, onClose }: Props) {
             </div>
           </div>
         </div>
+
+        {/* Custom measurables */}
+        {customMeasurables.length > 0 && (
+          <div>
+            <div className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Custom Measurables</div>
+            <div className="grid grid-cols-2 gap-3">
+              {customMeasurables.map((m) => (
+                <div key={m.id} className="flex flex-col gap-1.5">
+                  <Label>{m.name}{m.unit ? ` (${m.unit})` : ""}</Label>
+                  <Input
+                    name={`custom_${m.id}`}
+                    type="number"
+                    step="any"
+                    placeholder="-"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Notes */}
         <div className="flex flex-col gap-1.5">
